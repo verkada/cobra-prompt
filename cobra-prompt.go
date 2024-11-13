@@ -3,21 +3,12 @@ package cobraprompt
 import (
 	"context"
 	"os"
-	"os/signal"
-	"regexp"
 	"strings"
-	"syscall"
 
-	"github.com/pkg/term/termios"
+	"github.com/c-bata/go-prompt"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"github.com/verkada/go-prompt"
-	"golang.org/x/sys/unix"
 )
-
-var fd int
-
-var originalTermios *unix.Termios
 
 // DynamicSuggestionsAnnotation for dynamic suggestions.
 const DynamicSuggestionsAnnotation = "cobra-prompt-dynamic-suggestions"
@@ -32,7 +23,7 @@ type CobraPrompt struct {
 	RootCmd *cobra.Command
 
 	// GoPromptOptions is for customize go-prompt
-	// see https://github.com/tengteng/go-prompt/blob/master/option.go
+	// see https://github.com/c-bata/go-prompt/blob/master/option.go
 	GoPromptOptions []prompt.Option
 
 	// DynamicSuggestionsFunc will be executed if an command has CallbackAnnotation as an annotation. If it's included
@@ -80,73 +71,27 @@ func (co CobraPrompt) RunContext(ctx context.Context) {
 	}
 
 	co.prepare()
-	var err error
-	fd, err = syscall.Open("/dev/tty", syscall.O_RDONLY, 0)
-	if err != nil {
-		panic(err)
-	}
-	// get the original settings
-	originalTermios, err = termios.Tcgetattr(uintptr(fd))
-	if err != nil {
-		panic(err)
-	}
 
 	p := prompt.New(
-		func(input string) {
-			if err := termios.Tcsetattr(uintptr(fd), termios.TCSANOW, (*unix.Termios)(originalTermios)); err != nil {
-				panic(err)
-			}
-			ctx, cancel := context.WithCancel(context.Background())
-			c := make(chan os.Signal, 1)
-			signal.Notify(c, os.Interrupt)
-
-			go func() {
-				select {
-				case <-c:
-					cancel()
+		func(in string) {
+			promptArgs := co.parseArgs(in)
+			os.Args = append([]string{os.Args[0]}, promptArgs...)
+			if err := co.RootCmd.ExecuteContext(ctx); err != nil {
+				if co.OnErrorFunc != nil {
+					co.OnErrorFunc(err)
+				} else {
+					co.RootCmd.PrintErrln(err)
+					os.Exit(1)
 				}
-			}()
-			go func() {
-				defer cancel()
-				promptArgs := co.parseArgs(input)
-				os.Args = append([]string{os.Args[0]}, promptArgs...)
-				if err := co.RootCmd.ExecuteContext(ctx); err != nil {
-					if co.OnErrorFunc != nil {
-						co.OnErrorFunc(err)
-					} else {
-						co.RootCmd.PrintErrln(err)
-						os.Exit(1)
-					}
-				}
-			}()
-			select {
-			case <-ctx.Done():
-				return
 			}
-
 		},
 		func(d prompt.Document) []prompt.Suggest {
 			return findSuggestions(&co, &d)
 		},
 		co.GoPromptOptions...,
 	)
+
 	p.Run()
-}
-
-func parseArgsWithQuotes(input string) []string {
-	re := regexp.MustCompile(`"[^"]+"|\S+`)
-	matches := re.FindAllString(input, -1)
-
-	var args []string
-	for _, match := range matches {
-		// Remove surrounding double quotes if present
-		if strings.HasPrefix(match, `"`) && strings.HasSuffix(match, `"`) {
-			match = match[1 : len(match)-1]
-		}
-		args = append(args, match)
-	}
-
-	return args
 }
 
 func (co CobraPrompt) parseArgs(in string) []string {
@@ -154,7 +99,7 @@ func (co CobraPrompt) parseArgs(in string) []string {
 		return co.InArgsParser(in)
 	}
 
-	return parseArgsWithQuotes(in)
+	return strings.Fields(in)
 }
 
 func (co CobraPrompt) prepare() {

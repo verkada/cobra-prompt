@@ -4,9 +4,9 @@ import (
 	"os"
 	"strings"
 
-	cobraprompt "github.com/verkada/cobra-prompt"
-	"github.com/verkada/cobra-prompt/_example/cmd"
-	"github.com/verkada/go-prompt"
+	"github.com/c-bata/go-prompt"
+	cobraprompt "github.com/stromland/cobra-prompt"
+	"github.com/stromland/cobra-prompt/_example/cmd"
 )
 
 var advancedPrompt = &cobraprompt.CobraPrompt{
