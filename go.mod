@@ -1,4 +1,4 @@
-module cobra-prompt
+module github.com/verkada/cobra-prompt
 
 go 1.22.0
 
