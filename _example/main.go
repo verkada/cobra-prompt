@@ -4,8 +4,8 @@ import (
 	"os"
 	"strings"
 
-	cobraprompt "github.com/stromland/cobra-prompt"
-	"github.com/stromland/cobra-prompt/_example/cmd"
+	cobraprompt "github.com/verkada/cobra-prompt"
+	"github.com/verkada/cobra-prompt/_example/cmd"
 	"github.com/verkada/go-prompt"
 )
 

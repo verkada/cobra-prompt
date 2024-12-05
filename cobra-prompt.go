@@ -3,11 +3,12 @@ package cobraprompt
 import (
 	"context"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	prompt "github.com/verkada/go-prompt"
+	"github.com/verkada/go-prompt"
 )
 
 // DynamicSuggestionsAnnotation for dynamic suggestions.
@@ -23,7 +24,7 @@ type CobraPrompt struct {
 	RootCmd *cobra.Command
 
 	// GoPromptOptions is for customize go-prompt
-	// see https://github.com/c-bata/go-prompt/blob/master/option.go
+	// see https://github.com/verkada/go-prompt/blob/master/option.go
 	GoPromptOptions []prompt.Option
 
 	// DynamicSuggestionsFunc will be executed if an command has CallbackAnnotation as an annotation. If it's included
@@ -94,12 +95,28 @@ func (co CobraPrompt) RunContext(ctx context.Context) {
 	p.Run()
 }
 
+func parseArgsWithQuotes(input string) []string {
+	re := regexp.MustCompile(`"[^"]+"|\S+`)
+	matches := re.FindAllString(input, -1)
+
+	var args []string
+	for _, match := range matches {
+		// Remove surrounding double quotes if present
+		if strings.HasPrefix(match, `"`) && strings.HasSuffix(match, `"`) {
+			match = match[1 : len(match)-1]
+		}
+		args = append(args, match)
+	}
+
+	return args
+}
+
 func (co CobraPrompt) parseArgs(in string) []string {
 	if co.InArgsParser != nil {
 		return co.InArgsParser(in)
 	}
 
-	return strings.Fields(in)
+	return parseArgsWithQuotes(in)
 }
 
 func (co CobraPrompt) prepare() {
